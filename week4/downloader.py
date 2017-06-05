@@ -1,7 +1,9 @@
+#! /usr/bin/python
+
 import csv
 import sys
 
-class downloader():
+class downloader(object):
 
     def __init__(self, chunklist, template_url):
         self.chunks = chunklist.split(",")
@@ -9,12 +11,12 @@ class downloader():
 
     def get_data(self, template, start, end):
         for chunk in self.chunks:
-            get_chunk(chunk)
+            self.get_chunk(chunk)
 
     def get_chunk(self):
-        for i in self.chunks 
+        for chunk in self.chunks 
             conn = urllib.FancyURLopener()
-            conn.retrieve(self.template_url.format(i), 'chunk-{}'.format(i))
+            conn.retrieve(self.template_url.format(chunk), 'chunk-{}'.format(chunk))
             
     def open_chunk(self, filename):
         with open(filename, 'r') as csv:
@@ -31,12 +33,13 @@ class downloader():
 
 def main():
     chunklist = sys.argv[1]
-    url_template = "http://storage.googleapis.com/books/ngrams/books/googlebooks-eng-all-2gram-20090715-{}.csv.zip"
-    start_file_idx = 0
-    end_file_idx = 1
-
-    downloader = downloader(chunklist, url_template)
-    downloader.get_data()
+    print "downloading {}!".format(chunklist)
+#    url_template = "http://storage.googleapis.com/books/ngrams/books/googlebooks-eng-all-2gram-20090715-{}.csv.zip"
+#    start_file_idx = 0
+#    end_file_idx = 1
+#
+#    downloader = downloader(chunklist, url_template)
+#    downloader.get_data()
 
 
 

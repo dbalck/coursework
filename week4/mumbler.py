@@ -33,11 +33,5 @@ class agent():
 def main():
     get_chunk()
 
-# def main():
-#     print "starting..."
-#     client = create_ssh()
-#     for i in client:
-#         stdin, stdout, stderr = i.exec_command('ls -l')
-#         print stdout.read()
 
 if __name__ == "__main__": main()
