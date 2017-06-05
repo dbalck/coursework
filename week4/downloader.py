@@ -3,6 +3,8 @@
 import csv
 import sys
 import urllib
+from os import walk
+import zipfile
 
 class Downloader(object):
 
@@ -18,6 +20,15 @@ class Downloader(object):
         conn = urllib.FancyURLopener()
         print self.template_url % chunk
         conn.retrieve(self.template_url % chunk, '/gpfs/gpfsfpo/chunk-%s' % chunk)
+
+    def open_data(self):
+        chunks = []
+        for (dirpath, dirnames, filenames) in walk('/gpfs/gpfsfpo'):
+            chunks.extend(dirpath + filenames)
+        for ch in chunks:
+            z = zipfile.ZipFile(ch, 'r')
+        
+
             
     def open_chunk(self, filename):
         with open(filename, 'r') as csv:

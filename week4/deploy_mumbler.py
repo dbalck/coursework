@@ -52,7 +52,7 @@ class Master(object):
 
     def start_downloader(self, host, chunklist):
         cmd = "./downloader.py {} &".format(",".join(map(str,chunklist)))
-        return self.ssh_no_pass(host, cmd)
+        self.ssh_no_pass(host, cmd)
 
     # returns stdout of given command to specified host via ssh
     def ssh_no_pass(self, host, cmd):
@@ -64,7 +64,6 @@ class Master(object):
             ssh.connect(host, username="root", pkey=k)
             stdin, stdout, stderr =  ssh.exec_command(cmd)
             if stderr != None: print stderr.read()
-            yield stdout
         finally:
             ssh.close()
             
@@ -75,9 +74,7 @@ def main():
     master.deploy_agents()
     chunklists = master.divy_up(0, 6)
     for i in range(len(hosts)):
-        stdout = master.start_downloader(hosts[i], chunklists[i])
-        for i in stdout:
-            print i.read()
+        master.start_downloader(hosts[i], chunklists[i])
 
 if __name__ == "__main__":
     main()
