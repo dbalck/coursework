@@ -13,12 +13,10 @@ class Master(object):
 
     def deploy_agent(self, host):
         # copy downloader to nodes
-        os.system("scp -i {} downloader.py root@{}:~".format(self.pk_path, host))
-        os.system("ssh -i {} root@{} chmod +x downloader.py".format(self.pk_path, host))
+        os.system("scp -i {} downloader.py mumbler.py root@{}:~ &&  chmod +x downloader.py &&  chmod +x mumbler.py".format(self.pk_path, host))
+        #os.system("ssh -i {} root@{} ".format(self.pk_path, host))
 
         # copy mumbler to nodes
-        os.system("scp -i {} mumbler.py root@{}:~".format(self.pk_path, host))
-        os.system("ssh -i {} root@{} chmod +x mumbler.py".format(self.pk_path, host))
 
     def deploy_agents(self):
         for host in self.hosts:
@@ -26,18 +24,34 @@ class Master(object):
 
     # splits up indices between hosts, returns a list of lists of indices that should be queried
     def divy_up(self, start_idx, end_idx):
-        size = len(self.hosts)
+        host_num = len(self.hosts)
+        chunk_total = end_idx - start_idx 
+        quotient = chunk_total / host_num 
+        remainder = chunk_total % host_num 
         all_chunklists = []
-        for i in range(size):
-            chunklist = []
-            for j in range(start_idx, end_idx):
-                if j % size == i: 
-                    chunklist.append(j)
-            all_chunklists.append(chunklist)
+        chunklist = []
+        count  = 0
+        host_idx = 0
+        for i in range(start_idx, end_idx):
+            if (quotient > 0):
+                quotient = quotient - 1
+                chunklist.append(i)
+            else:
+                if (remainder > 0):
+                    remainder -= 1
+                    chunklist.append(i)
+                else:
+                    chunklist.append(i)
+                all_chunklists.append(chunklist[:])
+                chunklist = []
+                quotient = chunk_total / host_num 
+
+        all_chunklists.append(chunklist[:])
         return all_chunklists
 
+
     def start_downloader(self, host, chunklist):
-        cmd = "./dowloader.py {}".format(",".join(map(str,chunklist)))
+        cmd = "./downloader.py {} &".format(",".join(map(str,chunklist)))
         return self.ssh_no_pass(host, cmd)
 
     # returns stdout of given command to specified host via ssh
@@ -49,8 +63,8 @@ class Master(object):
         try: 
             ssh.connect(host, username="root", pkey=k)
             stdin, stdout, stderr =  ssh.exec_command(cmd)
-            return stdout.read()
-            
+            if stderr != None: print stderr.read()
+            yield stdout
         finally:
             ssh.close()
             
@@ -59,9 +73,11 @@ def main():
     pk_path = sys.argv[2]
     master = Master(hosts, pk_path)
     master.deploy_agents()
-    chunklists = master.divy_up(0, 100)
+    chunklists = master.divy_up(0, 6)
     for i in range(len(hosts)):
-        print master.start_downloader(hosts[i], chunklists[i])
+        stdout = master.start_downloader(hosts[i], chunklists[i])
+        for i in stdout:
+            print i.read()
 
 if __name__ == "__main__":
     main()
