@@ -3,7 +3,7 @@
 import csv
 import sys
 import urllib
-from os import walk
+import os
 import zipfile
 
 class Downloader(object):
@@ -21,28 +21,36 @@ class Downloader(object):
         print self.template_url % chunk
         conn.retrieve(self.template_url % chunk, '/gpfs/gpfsfpo/chunk-%s' % chunk)
 
-    def open_data(self):
-        chunks = []
-        for (dirpath, dirnames, filenames) in walk('/gpfs/gpfsfpo'):
-            chunks.extend(dirpath + filenames)
-        for ch in chunks:
-            z = zipfile.ZipFile(ch, 'r')
-        
+    def unzip_data(self):
+        print "unzipping!"
+
+        files = []
+        for (dirpath, dirnames, filenames) in os.walk('/gpfs/gpfsfpo/'):
+            files.extend(filenames)
+            print files
+        for f in files:
+            z = zipfile.ZipFile('/gpfs/gpfsfpo/' + f, 'r')
+            z.extractall('/gpfs/gpfsfpo/')
+            z.close()
+            os.remove('/gpfs/gpfsfpo/' + f)
 
             
-    def open_chunk(self, filename):
-        with open(filename, 'r') as csv:
-            f = csv.reader(csv, delimiter='\t')
+    def index_chunk(self, filename):
+        index = open(filename, 'a')
+        with open(filename, 'r') as csvfile:
+            f = csv.reader(csvfile, delimiter='\t')
             word = ""
             one_count = 0
             for line in f:
                 if word == line[0]:
                     # this is not a new word, increment word count
-                    count += line[2]
+                    one_count += line[3]
 
                 else:
-                     # new word, re-establish new count
-                     print "nop"
+                     # new word, re-establish new count and write to index
+                     index.write("%s %s %s" % (line[0], str(one_count), '\n'))
+                     one_count = line[3] 
+        index.close()
 
 def main():
     chunklist = sys.argv[1]
@@ -50,7 +58,8 @@ def main():
     url_template = "http://storage.googleapis.com/books/ngrams/books/googlebooks-eng-all-2gram-20090715-%s.csv.zip"
     downloader = Downloader(chunklist, url_template)
     downloader.get_data()
-
+    downloader.unzip_data()
+    downloader.index_chunk("googlebooks-eng-all-2gram-20090715-0.csv")
 
 
 

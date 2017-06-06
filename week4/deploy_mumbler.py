@@ -1,4 +1,4 @@
-#! /home/dbalck/anaconda2/bin/python 
+#! /Users/danielbalck/anaconda/bin/python 
 
 import os
 import sys
@@ -52,7 +52,7 @@ class Master(object):
 
     def start_downloader(self, host, chunklist):
         cmd = "./downloader.py {} &".format(",".join(map(str,chunklist)))
-        self.ssh_no_pass(host, cmd)
+        return self.ssh_no_pass(host, cmd)
 
     # returns stdout of given command to specified host via ssh
     def ssh_no_pass(self, host, cmd):
@@ -63,7 +63,8 @@ class Master(object):
         try: 
             ssh.connect(host, username="root", pkey=k)
             stdin, stdout, stderr =  ssh.exec_command(cmd)
-            if stderr != None: print stderr.read()
+            print stderr.read()
+            return stdout
         finally:
             ssh.close()
             
@@ -72,9 +73,10 @@ def main():
     pk_path = sys.argv[2]
     master = Master(hosts, pk_path)
     master.deploy_agents()
-    chunklists = master.divy_up(0, 6)
+    chunklists = master.divy_up(0, 1)
     for i in range(len(hosts)):
-        master.start_downloader(hosts[i], chunklists[i])
+        stdout = master.start_downloader(hosts[i], chunklists[i])
+        print stdout.read()
 
 if __name__ == "__main__":
     main()
