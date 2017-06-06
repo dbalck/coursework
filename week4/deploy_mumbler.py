@@ -1,4 +1,4 @@
-#! /Users/danielbalck/anaconda/bin/python 
+#! /home/dbalck/anaconda2/bin/python 
 
 import os
 import sys
@@ -13,10 +13,7 @@ class Master(object):
 
     def deploy_agent(self, host):
         # copy downloader to nodes
-        os.system("scp -i {} downloader.py mumbler.py root@{}:~ &&  chmod +x downloader.py &&  chmod +x mumbler.py".format(self.pk_path, host))
-        #os.system("ssh -i {} root@{} ".format(self.pk_path, host))
-
-        # copy mumbler to nodes
+        os.system("scp -i {} downloader.py mumbler.py root@{}:~ && ssh -i {} root@{}  'chmod +x downloader.py &&  chmod +x mumbler.py && rm -f /gpfs/gpfsfpo/google*'".format(self.pk_path, host, self.pk_path, host))
 
     def deploy_agents(self):
         for host in self.hosts:
@@ -70,13 +67,24 @@ class Master(object):
             
 def main():
     hosts = sys.argv[1].split(",")
+    hostnames = []
+    ips = []
+    for host in hosts:
+        one, two = host.split(":")
+        ips.append(one)
+        hostnames.append(two)
+    primary_host = ips[0]
     pk_path = sys.argv[2]
-    master = Master(hosts, pk_path)
+    master = Master(ips, pk_path)
     master.deploy_agents()
-    chunklists = master.divy_up(0, 1)
+    chunklists = master.divy_up(0,1)
+    os.system("ssh -i {} root@{} 'rm -f chunk_locations'".format(pk_path, primary_host))
     for i in range(len(hosts)):
-        stdout = master.start_downloader(hosts[i], chunklists[i])
-        print stdout.read()
+        ch = ",".join(map(str,chunklists[i]))
+        os.system("ssh -i {} root@{} echo '{} {} >> chunk_locations'".format(pk_path, primary_host, hostnames[i], ch ))
+    #for i in range(len(hosts)):
+    #    stdout = master.start_downloader(hosts[i], chunklists[i])
+    #    print stdout.read()
 
 if __name__ == "__main__":
     main()

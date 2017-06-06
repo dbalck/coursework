@@ -5,6 +5,7 @@ import sys
 import urllib
 import os
 import zipfile
+import codecs
 
 class Downloader(object):
 
@@ -18,7 +19,6 @@ class Downloader(object):
 
     def get_chunk(self, chunk):
         conn = urllib.FancyURLopener()
-        print self.template_url % chunk
         conn.retrieve(self.template_url % chunk, '/gpfs/gpfsfpo/chunk-%s' % chunk)
 
     def unzip_data(self):
@@ -27,30 +27,48 @@ class Downloader(object):
         files = []
         for (dirpath, dirnames, filenames) in os.walk('/gpfs/gpfsfpo/'):
             files.extend(filenames)
-            print files
         for f in files:
+            num = f[-1]
             z = zipfile.ZipFile('/gpfs/gpfsfpo/' + f, 'r')
             z.extractall('/gpfs/gpfsfpo/')
             z.close()
-            os.remove('/gpfs/gpfsfpo/' + f)
+            os.rename('/gpfs/gpfsfpo/googlebooks-eng-all-2gram-20090715-%s.csv' % num, "chunk-%s" % num)
 
             
-    def index_chunk(self, filename):
-        index = open(filename, 'a')
+    def iterate_chunk(self, filename):
+        csv.field_size_limit(sys.maxsize)
         with open(filename, 'r') as csvfile:
-            f = csv.reader(csvfile, delimiter='\t')
-            word = ""
-            one_count = 0
+            f = csv.reader(csvfile, delimiter='\t', lineterminator='\n', quoting=csv.QUOTE_NONE)
+            ngram = ""
+            count = 0
             for line in f:
-                if word == line[0]:
-                    # this is not a new word, increment word count
-                    one_count += line[3]
-
+                # if the first word as been seen before
+                if ngram == line[0]:
+                    count = count + int(line[2])
+                    continue
+                # new primary word, write the line and clear count 
                 else:
-                     # new word, re-establish new count and write to index
-                     index.write("%s %s %s" % (line[0], str(one_count), '\n'))
-                     one_count = line[3] 
+                    if ngram == "":
+                        ngram = line[0]
+                        count = int(line[2])
+                        continue
+                    yield ngram, count
+                    ngram = line[0]
+                    count = int(line[2])
+
+    def index_chunk(self, filename):
+        print "indexing"
+        index = open("index-%s" % filename[-1], 'a')
+        it = self.iterate_chunk(filename)
+        for ngram, count in it:
+            index.write("%s\t%d\n" % (ngram, count))
         index.close()
+
+
+
+    def grep_for_word(word):
+        os.system("grep '^%s'" % word)
+
 
 def main():
     chunklist = sys.argv[1]
@@ -59,7 +77,7 @@ def main():
     downloader = Downloader(chunklist, url_template)
     downloader.get_data()
     downloader.unzip_data()
-    downloader.index_chunk("googlebooks-eng-all-2gram-20090715-0.csv")
+    downloader.index_chunk("chunk-0")
 
 
 
