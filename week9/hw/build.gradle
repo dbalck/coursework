@@ -56,9 +56,9 @@ dependencies {
     // The production code uses the SLF4J logging API at compile time
     compile 'org.slf4j:slf4j-api:1.7.13'
 
-    compile 'org.apache.spark:spark-core_2.11:1.5.2'
-    compile 'org.apache.spark:spark-streaming_2.11:1.5.2'
-    compile 'org.apache.spark:spark-streaming-twitter_2.10:1.6.3'
+    compile 'org.apache.spark:spark-core_2.11:2.1.0'
+    compile 'org.apache.spark:spark-streaming_2.11:2.1.0'
+    compile 'org.apache.bahir:spark-streaming-twitter_2.11:2.1.1'
 
     // Declare the dependency for your favourite test framework you want to use in your tests.
     // TestNG is also supported by the Gradle Test task. Just change the
@@ -73,10 +73,10 @@ remotes {
     user = 'root'
     password = 'SLtHgx2P'
     agent = true
+
     identity = file("${System.properties['user.home']}/.ssh/sl")
   }
 }
-
 
 task deploy {
   doLast {
