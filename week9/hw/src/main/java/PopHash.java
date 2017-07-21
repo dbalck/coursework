@@ -35,6 +35,9 @@ import twitter4j.*;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Comparator;
+import java.io.Serializable;
+
 
 /**
  * Displays the most positive hash tags by joining the streaming Twitter data with a static RDD of
@@ -43,7 +46,7 @@ import java.util.List;
 public class PopHash {
 
   public static void main(String[] args) {
-    if (args.length < 4) {
+    if (args.length < 5) {
       System.err.println("Usage: <consumer key>" +
         " <consumer secret> <access token> <access token secret> [<filters>]");
       System.exit(1);
@@ -54,8 +57,9 @@ public class PopHash {
     String consumerSecret = args[1];
     String accessToken = args[2];
     String accessTokenSecret = args[3];
-    System.out.println("Made it!!");
-    String[] filters = Arrays.copyOfRange(args, 4, args.length);
+    Integer topHashCountPerWindow = new Integer(args[4]);
+    System.out.println("Starting!!");
+    String[] filters = Arrays.copyOfRange(args, 5, args.length);
 
     // Set the system properties so that Twitter4j library used by Twitter stream
     // can use them to generate OAuth credentials
@@ -63,6 +67,7 @@ public class PopHash {
     System.setProperty("twitter4j.oauth.consumerSecret", consumerSecret);
     System.setProperty("twitter4j.oauth.accessToken", accessToken);
     System.setProperty("twitter4j.oauth.accessTokenSecret", accessTokenSecret);
+
 
     SparkConf sparkConf = new SparkConf().setAppName("PopHash");
 
@@ -72,7 +77,7 @@ public class PopHash {
       System.out.println("running local mode, spark.master not found");
     }
 
-    JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, new Duration(5000));
+    JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, new Duration(10000));
     JavaReceiverInputDStream<Status> stream = TwitterUtils.createStream(jssc, filters);
 
     // map the tweet to its text as a k-v
@@ -81,8 +86,9 @@ public class PopHash {
 
     // map the #hashtag words in the value text to the tweet
     JavaPairDStream<Status, String> statusToWord = statusToText
-      .flatMapValues(text -> Arrays.asList(text.split(" ")).iterator());
+      .flatMapValues(text -> Arrays.asList(text.split(" ")));
 
+    // status to hashtag
     // filter for the #hashtag words in the value text to the tweet
     JavaPairDStream<Status, String> statusToHashTag = statusToWord
       .filter(pair -> pair._2().startsWith("#")); 
@@ -92,30 +98,63 @@ public class PopHash {
       .filter(pair -> pair._2().startsWith("@")); 
 
     // count the frequencies of the hashtags
-    JavaPairDStream<String, Long> hashTagToCount = statusToHashTag
-      .countByValueAndWindow(new Duration(10000));
+    JavaPairDStream<String, Integer> hashTagToCount = statusToHashTag
+      .mapToPair(pair -> new Tuple2<String, Integer>(pair._2(), 1))
+      .reduceByKeyAndWindow((x,y) -> x + y, new Duration(10000));
 
-    // sort the hashtags from most frequent to least
-    JavaPairDStream<Long, String> countToHashTagSorted = hashTagToCount
-      .mapToPair(x -> x.swap());
-      .transformToPair(rdd -> rdd.sortByKey(false));
 
     // swap the status message with the hashtags
     JavaPairDStream<String, Status> hashTagToStatus = statusToHashTag
       .mapToPair(x -> x.swap());
 
-    JavaPairDStream<String, Integer> hashTagMentions = statusToHashTags
-      .mapToPair(hash -> new Tuple2<String, Integer>(hash, 1))
-      .reduceByKeyAndWindow((x,y) -> x + y, new Duration(5000));
+    // hashtag to user
+    JavaPairDStream<String, String> hashTagToUser = statusToHashTag 
+      .mapToPair(x -> x.swap())
+      .mapToPair(pair -> new Tuple2<String, String>(pair._1(), pair._2().getText()))
+      .flatMapValues(text -> Arrays.asList(text.split(" ")))
+      .filter(pair -> pair._2().startsWith("@"))
+      .reduceByKeyAndWindow((x,y) -> x , new Duration(10000));
 
 
-    countToHashTagprint();
+    JavaPairDStream<Tuple2<Integer, String>, String> countAndUserToHashTag = hashTagToCount
+      .join(hashTagToUser)
+      .mapToPair(x -> x.swap());
+
+
+    // sort the tuples from most frequent to least
+    List<Tuple2<Integer, String>, String> countToHashTagAndUserSorted = countAndUserToHashTag 
+      .transformToPair(rdd -> rdd
+        .sortByKey(new TwitterComparator(), false)
+        .top(topHashCountPerWindow));
+
+    //countToHashTagAndUserSorted.print();
+    System.out.print(countToHashTagAndUserSorted);
+
+
+    // JavaPairDStream<String, Integer> hashTagMentions = statusToHashTags
+    //   .mapToPair(hash -> new Tuple2<String, Integer>(hash, 1))
+    //   .reduceByKeyAndWindow((x,y) -> x + y, new Duration(5000));
+
+
 
     jssc.start();
     try {
-      jssc.awaitTerminationOrTimeout(11000);
+      jssc.awaitTerminationOrTimeout(31000);
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
   }
+}
+
+class TwitterComparator implements Serializable, Comparator<Tuple2<Integer, String>> {
+
+    public int compare(Tuple2<Integer, String> a, Tuple2<Integer, String> b) {
+      if (a._1() < b._1()) {
+        return -1;
+      } else if (a._1() > b._1()) {
+        return 1;
+      } else {
+        return 0;
+      }
+    }
 }

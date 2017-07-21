@@ -71,7 +71,7 @@ remotes {
   sparkmaster {
     host = '169.54.25.214'
     user = 'root'
-    password = 'SLtHgx2P'
+    //password = 'SLtHgx2P'
     agent = true
 
     identity = file("${System.properties['user.home']}/.ssh/sl")
@@ -83,7 +83,7 @@ task deploy {
     ssh.run {
       session(remotes.sparkmaster) {
         put from: 'build/libs/hw-all.jar', into: '/root/'
-        execute ("/usr/local/spark/bin/spark-submit --class 'PopHash' --master spark://spark1:7077 hw-all.jar $consumerKey $consumerSecret $accessToken $accessTokenSecret", logging: 'stdout')
+        execute ("/usr/local/spark/bin/spark-submit --class 'PopHash' --master spark://spark1:7077 hw-all.jar $consumerKey $consumerSecret $accessToken $accessTokenSecret 6", logging: 'stdout')
       }
     }
   }
